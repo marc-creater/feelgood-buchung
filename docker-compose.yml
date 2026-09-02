@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: feelgood
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-feelgood}
+      POSTGRES_DB: feelgood
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U feelgood -d feelgood"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://feelgood:${DB_PASSWORD:-feelgood}@db:5432/feelgood
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"   # dahinter Caddy/Nginx/Traefik mit HTTPS
+
+  # Ruft alle 10 Minuten den Erinnerungs-Versand auf
+  cron:
+    image: curlimages/curl:latest
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - app
+    entrypoint: ["sh", "-c", "while true; do curl -fsS -H \"Authorization: Bearer $$CRON_SECRET\" http://app:3000/api/cron/reminders || echo 'cron: Fehler'; sleep 600; done"]
+
+  # Tägliches Backup der Datenbank nach ./backups (7 Tage aufbewahrt)
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${DB_PASSWORD:-feelgood}
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["sh", "-c", "while true; do pg_dump -h db -U feelgood feelgood | gzip > /backups/feelgood-$$(date +%F).sql.gz; find /backups -name '*.sql.gz' -mtime +7 -delete; sleep 86400; done"]
+
+volumes:
+  dbdata:

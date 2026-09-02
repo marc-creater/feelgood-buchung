@@ -1,0 +1,5 @@
+# Beispiel für Caddy als HTTPS-Reverse-Proxy (auf dem VPS, außerhalb dieses Compose-Stacks oder als weiterer Service)
+buchen.cabrera-feelgood.de {
+    reverse_proxy 127.0.0.1:3000
+    encode gzip
+}
