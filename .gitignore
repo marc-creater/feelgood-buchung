@@ -42,3 +42,6 @@ next-env.d.ts
 
 !.env.example
 e2e-*.png
+
+# Claude Code: lokale Einstellungen (können Zugangsdaten enthalten)
+.claude/settings.local.json
